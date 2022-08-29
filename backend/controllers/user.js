@@ -1,21 +1,34 @@
 const bcrypt = require('bcrypt');
-
 const User = require('../models/User');
-
 const jwt = require('jsonwebtoken');
+const passwordValidator = require('password-validator');
+const emailValidator = require('email-validator');
+
+const passwordSchema = new passwordValidator();
+passwordSchema
+    .is().min(8)                                    // Minimum 8 caractères
+    .is().max(100)                                  // Maximum 100 caractères
+    .has().uppercase()                              // Doit contenir au moins une majuscule
+    .has().lowercase()                              // Doit contenir au moins une minuscule
+    .has().digits()                                // Doit avoir au moins un chiffre
+    .has().not().spaces()                           // Ne doit pas avoir d'espaces
 
 exports.signup = (req, res, next) => {
-    bcrypt.hash(req.body.password, 10)
-        .then(hash => {
-            const user = new User({
-                email: req.body.email,
-                password: hash
-            });
-            user.save()
-                .then(() => res.status(201).json({ message: 'Utilisateur créé !' }))
-                .catch(error => res.status(400).json({ error }));
-        })
-        .catch(error => res.status(500).json({ error }));
+    if (!passwordSchema.validate(req.body.password), !emailValidator.validate(req.body.email)) {
+        return res.status(400).json({ error: "Email ou mot de passe non-valide" })
+    } else {
+        bcrypt.hash(req.body.password, 10)
+            .then(hash => {
+                const user = new User({
+                    email: req.body.email,
+                    password: hash
+                });
+                user.save()
+                    .then(() => res.status(201).json({ message: 'Utilisateur créé !' }))
+                    .catch(error => res.status(400).json({ error }));
+            })
+            .catch(error => res.status(500).json({ error }));
+    }
 };
 
 exports.login = (req, res, next) => {
@@ -33,7 +46,7 @@ exports.login = (req, res, next) => {
                         userId: user._id,
                         token: jwt.sign(
                             { userId: user._id },
-                            'RANDOM_TOKEN_SECRET',
+                            process.env.JWT_SECRET,
                             { expiresIn: '24h' }
                         )
                     });
@@ -41,4 +54,4 @@ exports.login = (req, res, next) => {
                 .catch(error => res.status(500).json({ error }));
         })
         .catch(error => res.status(500).json({ error }));
- };
+};
